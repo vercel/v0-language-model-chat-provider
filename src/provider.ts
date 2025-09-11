@@ -4,6 +4,8 @@ import {
 	LanguageModelChatInformation,
 	LanguageModelChatMessage,
 	LanguageModelChatProvider,
+	LanguageModelChatTool,
+	LanguageModelChatToolMode,
 	LanguageModelResponsePart,
 	LanguageModelTextPart,
 	Progress,
@@ -117,7 +119,7 @@ export class V0ChatModelProvider implements LanguageModelChatProvider {
 	async provideLanguageModelChatResponse(
 		model: LanguageModelChatInformation,
 		messages: Array<LanguageModelChatMessage>,
-		_options: ProvideLanguageModelChatResponseOptions,
+		options: ProvideLanguageModelChatResponseOptions,
 		progress: Progress<LanguageModelResponsePart>,
 		token: CancellationToken
 	): Promise<void> {
@@ -140,6 +142,8 @@ export class V0ChatModelProvider implements LanguageModelChatProvider {
 				model.id,
 				v0Messages,
 				apiKey,
+				options.tools,
+				options.toolMode,
 				token
 			);
 
@@ -222,17 +226,47 @@ export class V0ChatModelProvider implements LanguageModelChatProvider {
 			.join('');
 	}
 
+	private convertToolsToV0Format(tools: readonly LanguageModelChatTool[]): V0Tool[] {
+		return tools.map((tool) => ({
+			type: 'function',
+			function: {
+				name: tool.name,
+				description: tool.description,
+				parameters: tool.inputSchema || {}
+			}
+		}));
+	}
+
+	private convertToolMode(toolMode: LanguageModelChatToolMode): string {
+		switch (toolMode) {
+			case LanguageModelChatToolMode.Auto:
+				return 'auto';
+			case LanguageModelChatToolMode.Required:
+				return 'required';
+			default:
+				return 'auto';
+		}
+	}
+
 	private async makeV0Request(
 		modelId: string,
 		messages: V0ChatMessage[],
 		apiKey: string,
+		tools: readonly LanguageModelChatTool[] | undefined,
+		toolMode: LanguageModelChatToolMode,
 		token: CancellationToken
 	): Promise<V0ChatResponse> {
 		const requestBody: V0ChatRequest = {
 			model: modelId,
 			messages,
-			max_completion_tokens: 4000 // Default from v0 docs
+			max_completion_tokens: 64_000
 		};
+
+		// Convert and add tools if provided
+		if (tools && tools.length > 0) {
+			requestBody.tools = this.convertToolsToV0Format(tools);
+			requestBody.tool_choice = this.convertToolMode(toolMode);
+		}
 
 		const response = await fetch(
 			`${V0ChatModelProvider.BASE_URL}/v1/chat/completions`,
