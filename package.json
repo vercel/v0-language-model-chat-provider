@@ -1,0 +1,60 @@
+{
+	"name": "v0-model-provider",
+	"publisher": "v0-dev",
+	"displayName": "v0 Model Provider",
+	"description": "VS Code extension that provides v0 language models via the Language Model API.",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/ctate/v0-model-provider"
+	},
+	"version": "0.1.0",
+	"engines": {
+		"vscode": "^1.104.0-20250828"
+	},
+	"categories": [
+		"AI",
+		"Chat"
+	],
+	"contributes": {
+		"languageModelChatProviders": [
+			{
+				"vendor": "v0",
+				"displayName": "v0",
+				"managementCommand": "v0.manage"
+			}
+		],
+		"commands": [
+			{
+				"command": "v0.manage",
+				"title": "Manage v0 API Key"
+			}
+		]
+	},
+	"main": "./out/extension.js",
+	"scripts": {
+		"vscode:prepublish": "npm run compile",
+		"download-api": "dts dev",
+		"postdownload-api": "dts main",
+		"compile": "tsc -p ./",
+		"lint": "eslint",
+		"format": "prettier --write \"src/**/*.ts\"",
+		"watch": "tsc -watch -p ./"
+	},
+	"devDependencies": {
+		"@eslint/js": "^9.13.0",
+		"@stylistic/eslint-plugin": "^2.9.0",
+		"@types/node": "^22",
+		"@types/vscode": "^1.103.0",
+		"@vscode/dts": "^0.4.1",
+		"eslint": "^9.13.0",
+		"prettier": "^3.6.2",
+		"typescript": "^5.9.2",
+		"typescript-eslint": "^8.39.0"
+	},
+	"prettier": {
+		"semi": true,
+		"singleQuote": true,
+		"trailingComma": "none",
+		"useTabs": true
+	}
+}
