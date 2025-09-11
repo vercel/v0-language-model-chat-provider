@@ -8,6 +8,8 @@ import {
 	LanguageModelChatToolMode,
 	LanguageModelResponsePart,
 	LanguageModelTextPart,
+	LanguageModelToolCallPart,
+	LanguageModelToolResultPart,
 	Progress,
 	ProvideLanguageModelChatResponseOptions,
 	window,
@@ -17,6 +19,8 @@ import {
 interface V0ChatMessage {
 	role: 'user' | 'assistant' | 'system';
 	content: string;
+	tool_calls?: V0ToolCall[];
+	tool_call_id?: string;
 }
 
 interface V0Tool {
@@ -37,10 +41,20 @@ interface V0ChatRequest {
 	tool_choice?: string | object;
 }
 
+interface V0ToolCall {
+	id: string;
+	type: 'function';
+	function: {
+		name: string;
+		arguments: string;
+	};
+}
+
 interface V0ChatResponse {
 	choices: Array<{
 		message: {
 			content: string;
+			tool_calls?: V0ToolCall[];
 		};
 		delta?: {
 			content?: string;
@@ -148,11 +162,14 @@ export class V0ChatModelProvider implements LanguageModelChatProvider {
 			);
 
 			if (response && response.choices && response.choices.length > 0) {
-				const content =
-					response.choices[0].message?.content ||
-					response.choices[0].delta?.content ||
-					'No response from v0 API';
-				progress.report(new LanguageModelTextPart(content));
+				const message = response.choices[0].message;
+				if (message) {
+					this.processV0Response(message, progress);
+				} else {
+					progress.report(
+						new LanguageModelTextPart('Error: No response message from v0 API')
+					);
+				}
 			} else {
 				progress.report(
 					new LanguageModelTextPart('Error: No response from v0 API')
@@ -210,10 +227,101 @@ export class V0ChatModelProvider implements LanguageModelChatProvider {
 	private convertMessages(
 		messages: Array<LanguageModelChatMessage>
 	): V0ChatMessage[] {
-		return messages.map((msg) => ({
-			role: msg.role === 1 ? 'user' : 'assistant', // LanguageModelChatMessageRole.User = 1
-			content: this.extractTextFromMessage(msg)
-		}));
+		return messages.map((msg) => {
+			const role = msg.role === 1 ? 'user' : 'assistant'; // LanguageModelChatMessageRole.User = 1
+			const v0Message: V0ChatMessage = {
+				role,
+				content: ''
+			};
+
+			// Process message content parts
+			const textParts: string[] = [];
+			const toolCalls: V0ToolCall[] = [];
+			let toolCallId: string | undefined;
+
+			for (const part of msg.content) {
+				if (typeof part === 'object' && part !== null) {
+					if ('value' in part && typeof part.value === 'string') {
+						// Text part
+						textParts.push(part.value);
+					} else if (part instanceof LanguageModelToolCallPart) {
+						// Tool call part
+						toolCalls.push({
+							id: part.callId,
+							type: 'function',
+							function: {
+								name: part.name,
+								arguments: JSON.stringify(part.input)
+							}
+						});
+					} else if (part instanceof LanguageModelToolResultPart) {
+						// Tool result part
+						toolCallId = part.callId;
+						// Extract text content from tool result
+						const resultTexts = part.content
+							.filter((resultPart): resultPart is { value: string } =>
+								typeof resultPart === 'object' &&
+								resultPart !== null &&
+								'value' in resultPart
+							)
+							.map(resultPart => resultPart.value);
+						textParts.push(...resultTexts);
+					}
+				}
+			}
+
+			// Set content and tool-related fields
+			v0Message.content = textParts.join('');
+
+			if (toolCalls.length > 0) {
+				v0Message.tool_calls = toolCalls;
+			}
+
+			if (toolCallId) {
+				v0Message.tool_call_id = toolCallId;
+			}
+
+			return v0Message;
+		});
+	}
+
+	private processV0Response(
+		message: { content: string; tool_calls?: V0ToolCall[] },
+		progress: Progress<LanguageModelResponsePart>
+	): void {
+		// Report text content if present
+		if (message.content) {
+			progress.report(new LanguageModelTextPart(message.content));
+		}
+
+		// Process tool calls if present
+		if (message.tool_calls && message.tool_calls.length > 0) {
+			for (const toolCall of message.tool_calls) {
+				if (toolCall.type === 'function' && toolCall.function) {
+					try {
+						// Parse the JSON arguments string
+						const input = JSON.parse(toolCall.function.arguments);
+						progress.report(
+							new LanguageModelToolCallPart(
+								toolCall.id,
+								toolCall.function.name,
+								input
+							)
+						);
+					} catch (error) {
+						console.error('Failed to parse tool call arguments:', error);
+						// Still report the tool call with raw arguments as fallback
+						progress.report(
+							new LanguageModelToolCallPart(
+								toolCall.id,
+								toolCall.function.name,
+								{ arguments: toolCall.function.arguments }
+							)
+						);
+					}
+				}
+			}
+		}
 	}
 
 	private extractTextFromMessage(message: LanguageModelChatMessage): string {
