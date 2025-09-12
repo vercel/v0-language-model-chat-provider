@@ -1,7 +1,7 @@
 {
-	"name": "v0-language-model-chat-provider",
-	"publisher": "v0-dev",
-	"displayName": "v0 Language Model Chat Provider",
+	"name": "vscode-v0-model",
+	"publisher": "Vercel",
+	"displayName": "v0 Model for VS Code Chat",
 	"description": "VS Code extension that provides v0 language models for GitHub Copilot chat via the Language Model Chat Provider API.",
 	"repository": {
 		"type": "git",
