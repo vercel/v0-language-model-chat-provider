@@ -1,6 +1,6 @@
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { readFile, writeFile } from "fs/promises";
+import { readFile, writeFile, mkdir, rm } from "fs/promises";
 import { $ } from "execa";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -16,27 +16,36 @@ const pat = process.env.AZURE_TOKEN;
 // Compile TypeScript
 await $$`npm run compile`;
 
-// Temporarily create a clean package.json for vsce
-const originalPkg = await readFile(join(root, "package.json"), "utf-8");
-const pkg = JSON.parse(originalPkg);
-
-// Remove problematic fields that confuse vsce in pnpm workspace
-delete pkg.packageManager;
-const cleanPkg = JSON.stringify(pkg, null, "\t");
-await writeFile(join(root, "package.json"), cleanPkg);
+// Create a temporary clean directory for vsce
+const tempDir = join(root, ".vsce-temp");
+await rm(tempDir, { recursive: true, force: true });
+await mkdir(tempDir, { recursive: true });
 
 try {
-  // Package or publish the extension
+  // Copy only the necessary files to temp directory
+  await $$`cp package.json LICENSE README.md ${tempDir}/`;
+  await $$`cp -r out ${tempDir}/`;
+  await $$`cp .vscodeignore ${tempDir}/`;
+
+  // Clean the package.json in temp directory
+  const pkg = JSON.parse(await readFile(join(tempDir, "package.json"), "utf-8"));
+  delete pkg.packageManager;
+  delete pkg.devDependencies;
+  await writeFile(join(tempDir, "package.json"), JSON.stringify(pkg, null, "\t"));
+
+  // Run vsce from the clean temp directory
+  const $$temp = $({ cwd: tempDir });
+  
   if (publish) {
     if (preRelease) {
-      await $$`vsce publish --pre-release -p ${pat}`;
+      await $$temp`npx --yes @vscode/vsce publish --pre-release -p ${pat}`;
     } else {
-      await $$`vsce publish -p ${pat}`;
+      await $$temp`npx --yes @vscode/vsce publish -p ${pat}`;
     }
   } else {
-    await $$`vsce package`;
+    await $$temp`npx --yes @vscode/vsce package`;
   }
 } finally {
-  // Restore original package.json
-  await writeFile(join(root, "package.json"), originalPkg);
+  // Clean up temp directory
+  await rm(tempDir, { recursive: true, force: true });
 }
