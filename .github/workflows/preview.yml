@@ -21,10 +21,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install script dependencies
-        run: npm ci
-        working-directory: ./scripts
-
       - name: Set to preview version
         run: |
           # Update package.json to set it to preview version
@@ -42,8 +38,10 @@ jobs:
           echo "Updated package.json for preview"
           cat package.json
 
-      - name: Build and Publish Preview
-        run: npm run build-and-publish-preview
-        working-directory: ./scripts
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Publish Preview to VS Code Marketplace
+        run: npm run publish -- -p $AZURE_TOKEN --pre-release
         env:
           AZURE_TOKEN: ${{ secrets.AZURE_TOKEN }}

@@ -18,12 +18,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install script dependencies
-        run: npm ci
-        working-directory: ./scripts
+      - name: Compile TypeScript
+        run: npm run compile
 
-      - name: Build and Publish
-        run: npm run build-and-publish
-        working-directory: ./scripts
+      - name: Publish to VS Code Marketplace
+        run: npm run publish -- -p $AZURE_TOKEN
         env:
           AZURE_TOKEN: ${{ secrets.AZURE_TOKEN }}
