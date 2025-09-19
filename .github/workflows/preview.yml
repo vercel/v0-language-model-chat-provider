@@ -1,0 +1,47 @@
+name: "Publish Preview"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-publish:
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set to preview version
+        run: |
+          # Update package.json to set it to preview version
+          npm version prerelease --preid=preview --no-git-tag-version
+
+          # Update the name and displayName to indicate it's a preview
+          node -e "
+            const pkg = require('./package.json');
+            pkg.name = 'vscode-v0-model-preview';
+            pkg.displayName = 'v0 Model for VS Code Chat (Preview)';
+            pkg.description = pkg.description + ' (Preview Version)';
+            require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, '\t') + '\n');
+          "
+
+          echo "Updated package.json for preview"
+          cat package.json
+
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Publish Preview to VS Code Marketplace
+        run: npm run publish -- --pat $VSCE_TOKEN --pre-release
+        env:
+          VSCE_TOKEN: ${{ secrets.VSCE_TOKEN }}
