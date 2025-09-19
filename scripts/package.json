@@ -8,6 +8,6 @@
     "build-and-publish-preview": "node build-and-publish.js --publish --pre-release"
   },
   "dependencies": {
-    "execa": "^9.4.0"
+    "execa": "7.1.1"
   }
 }

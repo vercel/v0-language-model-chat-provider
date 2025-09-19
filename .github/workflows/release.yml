@@ -7,23 +7,38 @@ jobs:
   build-and-publish:
     runs-on: "ubuntu-latest"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: "npm"
+          node-version-file: ".node-version"
+
+      - uses: pnpm/action-setup@v2
+        name: Install pnpm
+        id: pnpm-install
+        with:
+          version: 8.3.1
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - uses: actions/cache@v3
+        name: Setup pnpm cache
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        run: npm ci
-
-      - name: Install script dependencies
-        run: npm ci
-        working-directory: ./scripts
+        run: pnpm install
 
       - name: Build and Publish
-        run: npm run build-and-publish
-        working-directory: ./scripts
+        run: pnpm -C scripts build-and-publish
         env:
           AZURE_TOKEN: ${{ secrets.AZURE_TOKEN }}
