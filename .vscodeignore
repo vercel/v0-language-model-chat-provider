@@ -8,9 +8,12 @@ vsc-extension-quickstart.md
 **/.eslintrc.json
 **/*.map
 **/*.ts
-node_modules/**
 .eslintrc.js
 eslint.config.mjs
 tsconfig.json
 .prettierrc
 .prettierignore
+scripts/**
+.node-version
+pnpm-workspace.yaml
+pnpm-lock.yaml

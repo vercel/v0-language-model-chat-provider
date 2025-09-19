@@ -1,5 +1,6 @@
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { readFile, writeFile } from "fs/promises";
 import { $ } from "execa";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -15,13 +16,27 @@ const pat = process.env.AZURE_TOKEN;
 // Compile TypeScript
 await $$`npm run compile`;
 
-// Package or publish the extension
-if (publish) {
-  if (preRelease) {
-    await $$`vsce publish --pre-release -p ${pat}`;
+// Temporarily create a clean package.json for vsce
+const originalPkg = await readFile(join(root, "package.json"), "utf-8");
+const pkg = JSON.parse(originalPkg);
+
+// Remove problematic fields that confuse vsce in pnpm workspace
+delete pkg.packageManager;
+const cleanPkg = JSON.stringify(pkg, null, "\t");
+await writeFile(join(root, "package.json"), cleanPkg);
+
+try {
+  // Package or publish the extension
+  if (publish) {
+    if (preRelease) {
+      await $$`vsce publish --pre-release -p ${pat}`;
+    } else {
+      await $$`vsce publish -p ${pat}`;
+    }
   } else {
-    await $$`vsce publish -p ${pat}`;
+    await $$`vsce package`;
   }
-} else {
-  await $$`vsce package`;
+} finally {
+  // Restore original package.json
+  await writeFile(join(root, "package.json"), originalPkg);
 }
