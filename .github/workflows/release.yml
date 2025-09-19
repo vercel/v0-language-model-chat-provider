@@ -22,6 +22,6 @@ jobs:
         run: npm run compile
 
       - name: Publish to VS Code Marketplace
-        run: npm run publish -- --pat $VSCE_TOKEN
+        run: npm run publish -- --pat $AZURE_TOKEN
         env:
-          VSCE_TOKEN: ${{ secrets.VSCE_TOKEN }}
+          AZURE_TOKEN: ${{ secrets.AZURE_TOKEN }}
